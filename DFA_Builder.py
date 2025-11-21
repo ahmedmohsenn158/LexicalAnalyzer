@@ -1,4 +1,6 @@
 import json
+from operator import ne
+import graphviz
 import os
 
 from IPython.core.display_functions import display
@@ -6,31 +8,19 @@ from collections import deque
 
 import NFA_Deserializer as nfa_tools
 
-def BuildDFA():
-    # 1. Deserialize the JSON
-    # (Assuming sample_nfa.json is uploaded to Colab files)
+def BuildDFA(input_nfa_json, output_dfa_json, output_min_dfa_json):
     try:
-        my_nfa = nfa_tools.deserialize_nfa_json('NFA/sample_2.json')
+        # 1. Deserialize the JSON NFA
+        my_nfa = nfa_tools.deserialize_nfa_json(input_nfa_json)
         print(f"Loaded NFA with {len(my_nfa.states)} states.")
-        #Create a new hashmap with all the keys of the inner hashmap of the transitions (inputs)
-        #each input will have a inner hashmap that consists of the key (the node id that was the key of the transactions map)
-        #and a value list of the states it goes to (if the key was already in the map add the new destinations to the list)
-
-        #now we need to actualy create the DFA
-        #we start from the actual start of the nfa
-        # we see for each input (key of my new map) Each key of the inner map that is in the starting state and add all those
-        #nodes to the new state
-        #this means we will add to the states set a node named with all the nodes it includes
-        #repeat for all inputs and nodes
-        #
+        
         # 2. Visualize
         dot = nfa_tools.visualize_nfa(my_nfa, output_filename="nfa_visualization")
 
         # 3. Display in Notebook
         display(dot)
 
-        # 4. Convert to DFA and display JSON
-        # 3. Build DFA
+        # 4. Convert to DFA 
         print("3. Converting NFA to DFA...")
         my_dfa = convert_nfa_to_dfa(my_nfa)
         print(f"   -> Generated DFA with {len(my_dfa.states)} states.")
@@ -43,10 +33,26 @@ def BuildDFA():
         print("5. DFA JSON Output:")
         print(my_dfa.to_json())
         
-        # Save to file
-        with open("dfa_output.json", "w") as f:
+        # 6. Save to file
+        with open(output_dfa_json, "w") as f:
             f.write(my_dfa.to_json())
-        print("   -> Saved to dfa_output.json")
+        print("   -> Saved to json file")
+
+        min_dfa = minimize_dfa(my_dfa)
+        print(f"Minimized DFA has {len(min_dfa.states)} states.")
+
+        # 7. Visualize DFA
+        print("4. Visualizing Min-DFA...")
+        visualize_graph(min_dfa, "min_dfa_graph", "MIN_DFA")
+
+        # 8. Output JSON
+        print("5. MIN_DFA JSON Output:")
+        print(min_dfa.to_json())
+        
+        # 9. Save to file
+        with open(output_min_dfa_json, "w") as f:
+            f.write(min_dfa.to_json())
+        print("  -> Saved to json file")
 
     except Exception as e:
         print(f"Error: {e}")
@@ -243,12 +249,122 @@ def visualize_graph(automaton, filename, title):
     except Exception as e:
         print(f"   -> Graphviz error (ignore if just testing logic): {e}")
 
-# ==========================================
-#       PART 4: MAIN EXECUTION
-# ==========================================
+def minimize_dfa(dfa):
+    """
+    Minimizes a DFA using Partition Refinement (same as lecture)
+    """
+    # 1. GET ALPHABET
+    alphabet = set()
+    for s in dfa.transitions:
+        for char in dfa.transitions[s]:
+            alphabet.add(char)
+    #alphabet = sorted(list(alphabet))
+    # 2. INITIAL PARTITION: [ {Non-Finals}, {Finals} ]
+    final_states = set(dfa.final_states)
+    non_final_states = dfa.states - final_states
 
+    # a list that stores all partitions
+    partitions = []
+    if non_final_states: partitions.append(non_final_states)
+    if final_states: partitions.append(final_states)
 
+    did_split_occur = True
+    while did_split_occur:
+        did_split_occur = False
+        new_partitions = []
+
+        for group in partitions:
+            if len(group) <= 1:
+                new_partitions.append(group)
+                continue
+            
+            #select the first group member as a reference state
+            group_list = list(group)
+            first = group_list[0]
+
+            #split the group into two groups one for states that match the reference transactions 
+            #and one for states that don't
+            matching_group = {first}
+            non_matching_group = set()
+
+            #helper function to get the partition the state belongs to
+            def get_partition_index(target_state,current_partitions):
+                if target_state is None:
+                    return -1
+                for idx, part in enumerate(current_partitions):
+                    if target_state in part:
+                        return idx
+                return -1
+            
+            #chack each state in the group against the reference state
+            for i in range(1, len(group_list)):
+                state = group_list[i]
+                is_matching = True
+
+                for char in alphabet:
+                    #where does the group reference go on the current input
+                    first_target = dfa.transitions.get(first, {}).get(char)
+                    #where does the current state go on the current input
+                    state_target = dfa.transitions.get(state, {}).get(char)
+                    
+                    #which group does the reference go to
+                    first_part = get_partition_index(first_target, partitions)
+                    #which group does the current state go to
+                    state_part = get_partition_index(state_target, partitions)
+
+                    if first_part != state_part:
+                        is_matching = False
+                        break
+
+                #add the state to the correct group
+                if is_matching:
+                    matching_group.add(state)
+                else:
+                    non_matching_group.add(state)
+            
+            #add the groups to the new partitions
+            if non_matching_group:
+                new_partitions.append(matching_group)
+                new_partitions.append(non_matching_group)
+                did_split_occur = True
+            else:
+                new_partitions.append(group)
+
+        #check for the newely updated partitions
+        partitions = new_partitions
+
+        if not did_split_occur:
+            break
     
+    # 4. reconstruct the DFA from the partitions created
+    min_dfa = DFA()
+    state_name_map = {}
+    # add states and finish states
+    for i, group in enumerate(partitions):
+        new_state_name = f"S{i}"
+        is_final = any(state in dfa.final_states for state in group)
+        min_dfa.add_state(new_state_name, is_final)
 
-if __name__ == "__main__":
-    BuildDFA()
+        #finding the start state
+        if dfa.start_state in group:
+            min_dfa.start_state = new_state_name
+
+        #map old states to new state names
+        for state in group:
+            state_name_map[state] = new_state_name
+    # add transitions
+    for group in partitions:
+        #one state of the joined group to represent the whole group
+        rep = next(iter(group))
+        #new joined state name
+        source_name = state_name_map[rep]
+        if rep in dfa.transitions:
+            for char, target in dfa.transitions[rep].items():
+                if target in state_name_map:
+                    #add the transition from the new state to the new target state
+                    min_dfa.add_transition(source_name, char, state_name_map[target])
+    
+    return min_dfa
+
+        
+
