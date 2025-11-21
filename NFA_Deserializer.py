@@ -83,7 +83,7 @@ def visualize_nfa(nfa, output_filename="nfa_graph"):
     """
     # Create a directed graph
     dot = graphviz.Digraph(comment='NFA Graph')
-    dot.attr(rankdir='LR') # Left-to-Right layout looks best for automata
+    dot.attr(rankdir='LR') # Left-to-Right layout
 
     # 1. Define Nodes
     for state in nfa.states:
@@ -92,23 +92,32 @@ def visualize_nfa(nfa, output_filename="nfa_graph"):
         else:
             dot.node(state, shape='circle')
 
-    # 2. Define invisible start node and edge
+    # 2. Define invisible start node
     dot.node('__start__', shape='point')
+    
+    # --- THE FIX: FORCE START TO LEFT ---
+    # We group the invisible start node and the actual start state 
+    # into a "rank=source" block. This forces them to be at the very beginning.
+    with dot.subgraph() as s:
+        s.attr(rank='source')
+        s.node('__start__')
+        s.node(nfa.start_state)
+    # ------------------------------------
+
     dot.edge('__start__', nfa.start_state)
 
     # 3. Define Edges (Transitions)
     for src, transitions in nfa.transitions.items():
         for symbol, targets in transitions.items():
             for dst in targets:
-                # If the symbol is empty or a specific epsilon marker, label it clearly
                 label = symbol
+                # Handle all epsilon variations
                 if symbol == "" or symbol.lower() == "epsilon" or symbol == "ε" or symbol == "\u00ce\u00b5":
-                    label = "\u03B5"  # Greek letter epsilon
+                    label = "ε"
                 
                 dot.edge(src, dst, label=label)
 
-    # Render the graph
-    # format='png' will generate a .png file
+    # Render
     output_path = dot.render(output_filename, format='png', cleanup=True)
     print(f"Graph generated: {output_path}")
     return dot
