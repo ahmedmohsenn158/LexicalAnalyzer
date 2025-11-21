@@ -102,8 +102,8 @@ def visualize_nfa(nfa, output_filename="nfa_graph"):
             for dst in targets:
                 # If the symbol is empty or a specific epsilon marker, label it clearly
                 label = symbol
-                if symbol == "" or symbol.lower() == "epsilon":
-                    label = "ε"
+                if symbol == "" or symbol.lower() == "epsilon" or symbol == "ε" or symbol == "\u00ce\u00b5":
+                    label = "\u03B5"  # Greek letter epsilon
                 
                 dot.edge(src, dst, label=label)
 
