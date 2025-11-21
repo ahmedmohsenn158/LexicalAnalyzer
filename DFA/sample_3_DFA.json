@@ -8,19 +8,21 @@
     "S1": {
         "isTerminatingState": false,
         "a": "S1",
-        "b": "S2"
+        "b": "S3"
     },
     "S2": {
         "isTerminatingState": false,
-        "a": "S3",
-        "b": "S4"
+        "a": "S1",
+        "b": "S2"
     },
     "S3": {
-        "isTerminatingState": true,
-        "a": "S3"
+        "isTerminatingState": false,
+        "a": "S1",
+        "b": "S4"
     },
     "S4": {
-        "isTerminatingState": false,
-        "a": "S3"
+        "isTerminatingState": true,
+        "a": "S1",
+        "b": "S2"
     }
 }

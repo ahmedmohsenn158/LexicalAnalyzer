@@ -117,7 +117,7 @@ def get_epsilon_closure(nfa, states_set):
         # Check if there are epsilon transitions from this state
         if current_state in nfa.transitions:
             for symbol, targets in nfa.transitions[current_state].items():
-                if symbol == "" or symbol.lower() == "epsilon" or symbol == "\u00ce\u00b5":
+                if symbol == "" or symbol.lower() == "epsilon" or symbol == "\u00ce\u00b5" or symbol == "\u03B5":
                     #loop on all the states reachable by epsilon transition
                     for next_state in targets:
                         if next_state not in closure:
@@ -153,7 +153,7 @@ def convert_nfa_to_dfa(nfa):
     alphabet = set()
     for src, trans in nfa.transitions.items():
         for symbol in trans.keys():
-            if symbol != "" and symbol.lower() != "epsilon" and symbol != "\u00ce\u00b5":
+            if symbol != "" and symbol.lower() != "epsilon" and symbol != "\u00ce\u00b5" and symbol != "\u03B5":
                 alphabet.add(symbol)
 
     # 2. Calculate Initial State (Start State + Epsilon Closure)
@@ -241,7 +241,7 @@ def visualize_graph(automaton, filename, title):
                 # Handle DFA (target is string) vs NFA (target is list)
                 target_list = targets if isinstance(targets, list) else [targets]
                 for dst in target_list:
-                    label = "ε" if symbol == "" or symbol.lower() == "epsilon" or symbol == "\u00ce\u00b5" else symbol
+                    label = "ε" if symbol == "" or symbol.lower() == "\u03B5" or symbol == "\u00ce\u00b5" else symbol
                     dot.edge(src, dst, label=label)
         
         output_path = dot.render(filename, format='png', cleanup=True)
